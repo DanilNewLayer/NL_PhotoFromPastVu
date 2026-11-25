@@ -1,0 +1,27 @@
+[general]
+name=NL_PhotoFromPastVu
+qgisMinimumVersion=3.22
+qgisMaximumVersion=3.99
+description=Photo from PastVu: search historical photos by map canvas or layer extent and download them.
+version=1.3.3
+author=Architect Danil Marzaev
+email=newlayer@ro.ru
+
+about=NL_PhotoFromPastVu finds historical photos on pastvu.com for the current map canvas or the extent of a selected layer. The extent is transformed to WGS84, so the plugin works with any project CRS. Found photos are added as a QGIS layer with year, direction, azimuth, source URL and local_path; images can be downloaded to disk, and the saved layer replaces the temporary layer. / Плагин ищет ретрофотографии на pastvu.com по текущему окну карты или охвату слоя, пересчитывает охват в WGS84 и работает в любой системе координат проекта. Фото добавляются в слой QGIS с годом, направлением, азимутом, ссылкой и local_path; изображения можно скачать, а сохранённый слой заменяет временный.
+
+tracker=https://github.com/DanilNewLayer/NL_PhotoFromPastVu/issues
+repository=https://github.com/DanilNewLayer/NL_PhotoFromPastVu
+homepage=https://github.com/DanilNewLayer/NL_PhotoFromPastVu#readme
+license=GPL-2.0
+
+hasProcessingProvider=no
+
+tags=pastvu,photos,history,architecture,web
+
+category=Web
+icon=icon.png
+experimental=False
+deprecated=False
+server=False
+
+changelog=1.3.3 — убран раздел «Публикация» из справки и исправлена подпись автора. 1.3.2 — возвращены иконки на кнопки и нормальная иконка обновления списка слоёв. 1.3.1 — исправлено окно сохранения слоя, сброс поиска при закрытии, обновление выделения и стрелки в списках. 1.3.0 — плагин переименован в NL_PhotoFromPastVu; красная шапка и кнопки; логотип «Новый слой»; стиль точек RetroPhoto; подпись мастерской; подготовка к публикации. 1.2 — возвращён прежний дизайн. 1.1 — сохранение с заменой временного слоя. 1.0 — первый релиз.

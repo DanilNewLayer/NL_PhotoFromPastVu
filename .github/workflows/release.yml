@@ -1,0 +1,36 @@
+name: Release plugin package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build QGIS plugin package
+        run: |
+          mkdir -p build/NL_PhotoFromPastVu
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='build' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='*.zip' \
+            ./ build/NL_PhotoFromPastVu/
+          cd build
+          zip -r ../NL_PhotoFromPastVu.zip NL_PhotoFromPastVu
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: NL_PhotoFromPastVu.zip
