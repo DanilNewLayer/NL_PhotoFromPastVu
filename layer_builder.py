@@ -12,6 +12,7 @@ from qgis.core import (
     QgsField,
     QgsGeometry,
     QgsMarkerSymbol,
+    QgsMessageLog,
     QgsPointXY,
     QgsProject,
     QgsProperty,
@@ -21,6 +22,7 @@ from qgis.core import (
     QgsVectorDataProvider,
     QgsVectorFileWriter,
     QgsVectorLayer,
+    Qgis,
 )
 from qgis.PyQt.QtCore import QPointF, QT_VERSION_STR, QVariant
 from qgis.PyQt.QtGui import QColor
@@ -37,10 +39,13 @@ else:
     INT_TYPE = QVariant.Int
     STR_TYPE = QVariant.String
 
-try:
-    OPEN_URL_ACTION = QgsAction.ActionType.OpenUrl
-except AttributeError:  # QGIS < 3.30
-    OPEN_URL_ACTION = QgsAction.OpenUrl
+OPEN_URL_ACTION = QgsAction.ActionType.OpenUrl
+
+
+def _log_optional_error(label: str, exc: Exception):
+    QgsMessageLog.logMessage(
+        f"{label}: {exc}", "NL_PhotoFromPastVu", Qgis.MessageLevel.Info
+    )
 
 AZIMUTH = {
     "n": 0, "ne": 45, "e": 90, "se": 135,
@@ -128,35 +133,35 @@ def _marker_symbol():
     if os.path.exists(svg_path):
         symbol_layer = QgsSvgMarkerSymbolLayer(svg_path)
         symbol_layer.setSize(11.5)
-        symbol_layer.setSizeUnit(QgsUnitTypes.RenderMillimeters)
+        symbol_layer.setSizeUnit(QgsUnitTypes.RenderUnit.RenderMillimeters)
         symbol_layer.setFillColor(QColor(200, 50, 26))
         symbol_layer.setStrokeColor(QColor(255, 255, 255))
         try:
             symbol_layer.setStrokeWidth(0)
-            symbol_layer.setStrokeWidthUnit(QgsUnitTypes.RenderMillimeters)
-        except AttributeError:
-            pass
+            symbol_layer.setStrokeWidthUnit(QgsUnitTypes.RenderUnit.RenderMillimeters)
+        except AttributeError as exc:
+            _log_optional_error("Ширина обводки маркера", exc)
         symbol_layer.setOffset(QPointF(0.0, -1.4))
-        symbol_layer.setOffsetUnit(QgsUnitTypes.RenderMillimeters)
+        symbol_layer.setOffsetUnit(QgsUnitTypes.RenderUnit.RenderMillimeters)
         try:
             symbol_layer.setHorizontalAnchorPoint(1)  # center
             symbol_layer.setVerticalAnchorPoint(1)    # center
-        except (AttributeError, TypeError):
-            pass
+        except (AttributeError, TypeError) as exc:
+            _log_optional_error("Якорь маркера", exc)
         try:
             symbol_layer.setDataDefinedProperty(
-                QgsSymbolLayer.PropertyAngle,
+                QgsSymbolLayer.Property.PropertyAngle,
                 QgsProperty.fromExpression('"azimuth"'),
             )
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, TypeError, RuntimeError) as exc:
+            _log_optional_error("Поворот маркера по азимуту", exc)
         symbol = QgsMarkerSymbol()
         symbol.changeSymbolLayer(0, symbol_layer)
         try:
             symbol.setSize(11.5)
-            symbol.setSizeUnit(QgsUnitTypes.RenderMillimeters)
-        except AttributeError:
-            pass
+            symbol.setSizeUnit(QgsUnitTypes.RenderUnit.RenderMillimeters)
+        except AttributeError as exc:
+            _log_optional_error("Размер маркера", exc)
         return symbol
     return QgsMarkerSymbol.createSimple({
         "name": "circle",
@@ -178,8 +183,8 @@ def _attach_actions(layer: QgsVectorLayer):
             OPEN_URL_ACTION, "Открыть локальную копию",
             "file:///[%local_path%]", False,
         )
-    except Exception:  # noqa: BLE001 - действия не критичны для работы
-        pass
+    except (AttributeError, TypeError, RuntimeError) as exc:
+        _log_optional_error("Действия слоя", exc)
 
 
 def create_layer(photos, base_name: str = "Retro_Photo") -> QgsVectorLayer:
@@ -258,10 +263,7 @@ def update_local_paths(layer, mapping: dict) -> int:
         return 0
 
     provider = layer.dataProvider()
-    try:
-        change_capability = QgsVectorDataProvider.Capability.ChangeAttributeValues
-    except AttributeError:
-        change_capability = QgsVectorDataProvider.ChangeAttributeValues
+    change_capability = QgsVectorDataProvider.Capability.ChangeAttributeValues
 
     if provider.capabilities() & change_capability:
         if provider.changeAttributeValues(changes):
@@ -312,17 +314,15 @@ def save_layer_as(layer, path: str) -> SavedLayer:
     options.fileEncoding = "UTF-8"
     options.layerName = os.path.splitext(os.path.basename(path))[0]
     if driver == "GPKG" and os.path.exists(path):
-        try:
-            action = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
-        except AttributeError:
-            action = QgsVectorFileWriter.CreateOrOverwriteLayer
-        options.actionOnExistingFile = action
+        options.actionOnExistingFile = (
+            QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
+        )
 
     result = QgsVectorFileWriter.writeAsVectorFormatV3(
         layer, path, QgsProject.instance().transformContext(), options
     )
     error_code, error_message = result[0], result[1]
-    if error_code != QgsVectorFileWriter.NoError:
+    if error_code != QgsVectorFileWriter.WriterError.NoError:
         raise IOError(error_message or "Не удалось сохранить слой.")
     saved_path = result[2] if len(result) > 2 and result[2] else path
     saved_name = result[3] if len(result) > 3 and result[3] else options.layerName
@@ -338,32 +338,32 @@ def open_saved_layer(saved: SavedLayer, display_name: str, source_layer):
     layer.setName(display_name or saved.layer_name)
     try:
         layer.setRenderer(source_layer.renderer().clone())
-    except Exception:  # noqa: BLE001
-        pass
+    except (AttributeError, RuntimeError, TypeError) as exc:
+        _log_optional_error("Перенос рендерера", exc)
     aliases = {field.name(): field.alias() for field in source_layer.fields()}
     for field in layer.fields():
         alias = aliases.get(field.name())
         if alias:
             try:
                 layer.setFieldAlias(field.name(), alias)
-            except Exception:  # noqa: BLE001
-                pass
+            except (AttributeError, RuntimeError, TypeError) as exc:
+                _log_optional_error(f"Псевдоним поля {field.name()}", exc)
     try:
         layer.setOpacity(source_layer.opacity())
-    except Exception:  # noqa: BLE001
-        pass
+    except (AttributeError, RuntimeError, TypeError) as exc:
+        _log_optional_error("Прозрачность слоя", exc)
     try:
         if source_layer.displayExpression():
             layer.setDisplayExpression(source_layer.displayExpression())
-    except Exception:  # noqa: BLE001
-        pass
+    except (AttributeError, RuntimeError, TypeError) as exc:
+        _log_optional_error("Выражение отображения", exc)
     try:
         layer.setLabelsEnabled(source_layer.labelsEnabled())
         labeling = source_layer.labeling()
         if labeling is not None:
             layer.setLabeling(labeling.clone())
-    except Exception:  # noqa: BLE001
-        pass
+    except (AttributeError, RuntimeError, TypeError) as exc:
+        _log_optional_error("Подписи слоя", exc)
     layer.setCustomProperty("adm_photofrompastvu", "1")
     _attach_actions(layer)
     return layer

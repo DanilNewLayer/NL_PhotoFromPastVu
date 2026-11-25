@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.4 — 2026-11-25
+
+- Все сетевые URL проверяются: разрешены только HTTPS и домены PastVu;
+  запрещены `file://`, сторонние хосты, нестандартные порты и redirect
+  на неразрешённый адрес.
+- Убраны `except Exception: pass`: заменены конкретными исключениями
+  и логированием, чтобы ошибки не терялись.
+- Перечисления переведены на scoped-имена PyQt6/QGIS 4:
+  `Qt.AlignmentFlag`, `QMessageBox.StandardButton`,
+  `QgsUnitTypes.RenderUnit`, `QgsVectorFileWriter.WriterError` и т. д.
+- Добавлен модуль `security.py`.
+
 ## 1.3.3 — 2026-11-25
 
 - Из README/справки убран раздел «Публикация».

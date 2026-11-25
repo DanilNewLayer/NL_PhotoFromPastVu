@@ -49,7 +49,7 @@ planning studio.
 
 ### Из ZIP
 
-1. Скачайте `NL_PhotoFromPastVu-1.3.3.zip`.
+1. Скачайте `NL_PhotoFromPastVu-1.3.4.zip`.
 2. В QGIS: **Модули → Управление модулями… → Установить из ZIP**.
 3. Включите `NL_PhotoFromPastVu`.
 
@@ -116,6 +116,7 @@ NL_PhotoFromPastVu/
 ├── api.py                # клиент PastVu API
 ├── geo.py                # охват → GeoJSON WGS84
 ├── config.py             # константы и QgsSettings
+├── security.py           # проверка HTTPS-URL и безопасные redirect
 ├── ui.py                 # QSS, иконки, кликабельный логотип
 ├── assets/               # логотип и SVG-стрелка
 ├── docs/                 # скриншоты

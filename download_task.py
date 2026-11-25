@@ -9,10 +9,11 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
-from qgis.core import QgsTask
+from qgis.core import QgsMessageLog, QgsTask, Qgis
 from qgis.PyQt.QtCore import pyqtSignal
 
 from .api import USER_AGENT, REFERER, photo_url
+from .security import IMAGE_HOSTS, open_url, validate_https_url
 
 _INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RESERVED_NAMES = {
@@ -39,7 +40,7 @@ class SearchTask(QgsTask):
 
     def __init__(self, client, geometry, zoom, year=None, year2=None,
                  is_painting=False):
-        super().__init__("Поиск фотографий PastVu", QgsTask.CanCancel)
+        super().__init__("Поиск фотографий PastVu", QgsTask.Flag.CanCancel)
         self.client = client
         self.geometry = geometry
         self.zoom = zoom
@@ -76,7 +77,7 @@ class DownloadTask(QgsTask):
     fileFailed = pyqtSignal(object, str)
 
     def __init__(self, items, folder, size, template, overwrite=False):
-        super().__init__("Скачивание фотографий PastVu", QgsTask.CanCancel)
+        super().__init__("Скачивание фотографий PastVu", QgsTask.Flag.CanCancel)
         self.items = list(items)
         self.folder = folder
         self.size = size
@@ -141,6 +142,7 @@ class DownloadTask(QgsTask):
         return os.path.join(self.folder, name)
 
     def _download(self, url: str, target: str):
+        url = validate_https_url(url, IMAGE_HOSTS)
         temporary = target + ".part"
         request = urllib.request.Request(url, headers={
             "User-Agent": USER_AGENT,
@@ -148,7 +150,7 @@ class DownloadTask(QgsTask):
             "Accept": "image/*,*/*;q=0.8",
         })
         try:
-            with urllib.request.urlopen(request, timeout=90) as response, \
+            with open_url(request, timeout=90, allowed_hosts=IMAGE_HOSTS) as response, \
                     open(temporary, "wb") as handle:
                 content_type = (response.headers.get("Content-Type") or "").lower()
                 if content_type and not content_type.startswith(
@@ -168,8 +170,11 @@ class DownloadTask(QgsTask):
             try:
                 if os.path.exists(temporary):
                     os.remove(temporary)
-            except OSError:
-                pass
+            except OSError as exc:
+                QgsMessageLog.logMessage(
+                    f"Не удалось удалить временный файл {temporary}: {exc}",
+                    "NL_PhotoFromPastVu", Qgis.MessageLevel.Info,
+                )
             raise
 
 

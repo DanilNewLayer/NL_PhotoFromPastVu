@@ -70,12 +70,12 @@ class DownloadDialog(QDialog):
         if os.path.exists(logo_path):
             logo_pixmap = QPixmap(logo_path)
             if not logo_pixmap.isNull():
-                logo_pixmap = logo_pixmap.scaledToHeight(38, Qt.SmoothTransformation)
+                logo_pixmap = logo_pixmap.scaledToHeight(38, Qt.TransformationMode.SmoothTransformation)
                 logo = ClickableLabel()
                 logo.setObjectName("Logo")
                 logo.setPixmap(logo_pixmap)
                 logo.setFixedSize(logo_pixmap.size())
-                logo.setCursor(Qt.PointingHandCursor)
+                logo.setCursor(Qt.CursorShape.PointingHandCursor)
                 logo.setToolTip("newlayer.ru — градостроительная мастерская «Новый слой»")
                 logo.clicked.connect(
                     lambda: QDesktopServices.openUrl(QUrl("https://newlayer.ru/"))
@@ -172,7 +172,7 @@ class DownloadDialog(QDialog):
 
         signature = QLabel("разработано в градостроительной мастерской «Новый слой»")
         signature.setObjectName("Footer")
-        signature.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        signature.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(signature)
 
         buttons = QHBoxLayout()
@@ -215,16 +215,16 @@ class DownloadDialog(QDialog):
             return
         try:
             self.layer.selectionChanged.connect(self._on_layer_selection_changed)
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError, TypeError):
+            return
 
     def _disconnect_layer(self):
         if self.layer is None:
             return
         try:
             self.layer.selectionChanged.disconnect(self._on_layer_selection_changed)
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError, TypeError):
+            return
 
     def _on_layer_selection_changed(self):
         self._update_counts()
@@ -237,14 +237,17 @@ class DownloadDialog(QDialog):
         total = 0
         try:
             total = self.layer.featureCount()
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError):
+            total = 0
         selected = 0
         if self.layer is not None:
             try:
                 selected = self.layer.selectedFeatureCount()
-            except Exception:  # noqa: BLE001
-                selected = len(self.layer.selectedFeatureIds())
+            except (AttributeError, RuntimeError):
+                try:
+                    selected = len(self.layer.selectedFeatureIds())
+                except (AttributeError, RuntimeError):
+                    selected = 0
         self.radio_all.setText(f"Все объекты слоя — {total}")
         self.radio_selected.setText(f"Только выделенные объекты — {selected}")
         self.radio_selected.setEnabled(selected > 0)
@@ -478,10 +481,10 @@ class DownloadDialog(QDialog):
             answer = QMessageBox.question(
                 self, "Скачивание идёт",
                 "Остановить скачивание и закрыть окно?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if answer != QMessageBox.Yes:
+            if answer != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
             self._closing = True

@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 
 from .config import API_URL, DEFAULT_TIMEOUT, REFERER, USER_AGENT
+from .security import API_HOSTS, open_url, validate_https_url
 
 SIZE_PREFIXES = {
     "a": "https://img.pastvu.com/a/",
@@ -95,7 +96,12 @@ class PastVuClient:
     """Минимальный клиент: только то, что нужно плагину."""
 
     def __init__(self, api_url: str = API_URL, timeout: int = DEFAULT_TIMEOUT):
-        self.api_url = (api_url or API_URL).strip()
+        try:
+            self.api_url = validate_https_url(
+                (api_url or API_URL).strip(), API_HOSTS
+            )
+        except ValueError as exc:
+            raise PastVuError(f"Некорректный адрес API PastVu: {exc}") from exc
         self.timeout = int(timeout or DEFAULT_TIMEOUT)
 
     def get_by_bounds(self, geometry, z: int, year=None, year2=None,
@@ -148,15 +154,15 @@ class PastVuClient:
                 self.api_url, data=payload, method="POST", headers=headers
             )
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                with open_url(request, self.timeout, API_HOSTS) as response:
                     raw = response.read()
                 break
             except urllib.error.HTTPError as exc:
                 body = ""
                 try:
                     body = exc.read().decode("utf-8", "replace")
-                except Exception:  # noqa: BLE001
-                    pass
+                except OSError:
+                    body = ""
                 code, message = _parse_api_error(body)
                 if code:
                     raise PastVuError(

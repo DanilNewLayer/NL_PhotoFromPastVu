@@ -14,7 +14,7 @@ from qgis.core import QgsSettings
 from qgis.PyQt.QtCore import QStandardPaths
 
 PLUGIN_NAME = "NL_PhotoFromPastVu"
-PLUGIN_VERSION = "1.3.3"
+PLUGIN_VERSION = "1.3.4"
 PLUGIN_TITLE = "Фото из PastVu"
 
 MENU_NAME = "&Модули newlayer.ru"

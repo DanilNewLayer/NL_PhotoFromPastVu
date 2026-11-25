@@ -32,7 +32,7 @@ class ClickableLabel(QLabel):
     clicked = pyqtSignal()
 
     def mousePressEvent(self, event):  # noqa: N802
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -91,7 +91,7 @@ DARK = {
 
 
 def is_dark_palette(palette: QPalette) -> bool:
-    return palette.color(QPalette.Window).lightness() < 128
+    return palette.color(QPalette.ColorRole.Window).lightness() < 128
 
 
 def apply_theme_text(widget: QWidget):
@@ -103,9 +103,9 @@ def apply_theme_text(widget: QWidget):
         if not isinstance(child, (QGroupBox, QRadioButton, QCheckBox)):
             continue
         palette = child.palette()
-        palette.setColor(QPalette.WindowText, color)
-        palette.setColor(QPalette.Text, color)
-        palette.setColor(QPalette.ButtonText, color)
+        palette.setColor(QPalette.ColorRole.WindowText, color)
+        palette.setColor(QPalette.ColorRole.Text, color)
+        palette.setColor(QPalette.ColorRole.ButtonText, color)
         child.setPalette(palette)
 
 

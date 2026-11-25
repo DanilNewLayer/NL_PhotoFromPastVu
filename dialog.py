@@ -9,6 +9,7 @@ from qgis.core import (
     Qgis,
     QgsApplication,
     QgsMapLayer,
+    QgsMessageLog,
     QgsNetworkAccessManager,
     QgsProject,
     QgsSettings,
@@ -42,6 +43,7 @@ from qgis.PyQt.QtWidgets import (
 
 from . import config, geo
 from .api import PastVuClient, photo_url
+from .security import IMAGE_HOSTS, validate_https_url
 from .download_dialog import DownloadDialog
 from .download_task import SearchTask
 from .layer_builder import (
@@ -55,11 +57,11 @@ from .layer_builder import (
 )
 from .ui import ClickableLabel, apply_theme_text, build_stylesheet, theme_icon
 
-USER_ROLE = Qt.UserRole
-CHECKED_STATE = Qt.Checked
-UNCHECKED_STATE = Qt.Unchecked
-ITEM_FLAGS = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-CHECK_FLAGS = ITEM_FLAGS | Qt.ItemIsUserCheckable
+USER_ROLE = Qt.ItemDataRole.UserRole
+CHECKED_STATE = Qt.CheckState.Checked
+UNCHECKED_STATE = Qt.CheckState.Unchecked
+ITEM_FLAGS = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+CHECK_FLAGS = ITEM_FLAGS | Qt.ItemFlag.ItemIsUserCheckable
 
 
 def _year_text(photo) -> str:
@@ -117,7 +119,7 @@ class PhotoFromPastVuDialog(QDialog):
         root.setSpacing(10)
         root.addWidget(self._build_header())
 
-        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.addWidget(self._build_left_panel())
         self.splitter.addWidget(self._build_results_panel())
@@ -139,7 +141,7 @@ class PhotoFromPastVuDialog(QDialog):
         bottom.addWidget(self.progress)
         signature = QLabel("разработано в градостроительной мастерской «Новый слой»")
         signature.setObjectName("Footer")
-        signature.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        signature.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         bottom.addWidget(signature)
         root.addLayout(bottom)
 
@@ -156,12 +158,12 @@ class PhotoFromPastVuDialog(QDialog):
         if os.path.exists(logo_path):
             logo_pixmap = QPixmap(logo_path)
             if not logo_pixmap.isNull():
-                logo_pixmap = logo_pixmap.scaledToHeight(48, Qt.SmoothTransformation)
+                logo_pixmap = logo_pixmap.scaledToHeight(48, Qt.TransformationMode.SmoothTransformation)
                 logo = ClickableLabel()
                 logo.setObjectName("Logo")
                 logo.setPixmap(logo_pixmap)
                 logo.setFixedSize(logo_pixmap.size())
-                logo.setCursor(Qt.PointingHandCursor)
+                logo.setCursor(Qt.CursorShape.PointingHandCursor)
                 logo.setToolTip("newlayer.ru — градостроительная мастерская «Новый слой»")
                 logo.clicked.connect(self._open_newlayer)
                 layout.addWidget(logo)
@@ -180,7 +182,7 @@ class PhotoFromPastVuDialog(QDialog):
         link = QLabel('<a href="https://pastvu.com" style="color:#ffffff;">pastvu.com</a>')
         link.setObjectName("HeaderLink")
         link.setOpenExternalLinks(True)
-        layout.addWidget(link, 0, Qt.AlignRight | Qt.AlignVCenter)
+        layout.addWidget(link, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return header
 
     def _open_newlayer(self):
@@ -212,7 +214,7 @@ class PhotoFromPastVuDialog(QDialog):
         layer_row = QHBoxLayout()
         layer_row.setSpacing(4)
         self.layer_combo = QComboBox()
-        self.layer_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.layer_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.layer_combo.setMinimumContentsLength(16)
         self.refresh_layers_btn = QToolButton()
         self.refresh_layers_btn.setIcon(theme_icon("mActionRefresh.svg") or QIcon())
@@ -291,7 +293,7 @@ class PhotoFromPastVuDialog(QDialog):
 
         source = QLabel("Данные: pastvu.com · публичный API")
         source.setObjectName("Hint")
-        source.setAlignment(Qt.AlignCenter)
+        source.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(source)
         layout.addStretch(1)
 
@@ -318,14 +320,14 @@ class PhotoFromPastVuDialog(QDialog):
         self.select_all_btn = QToolButton()
         self.select_all_btn.setIcon(theme_icon("mActionSelectAll.svg") or QIcon())
         self.select_all_btn.setText("Все")
-        self.select_all_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.select_all_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.select_all_btn.setToolTip("Отметить все фотографии")
         self.select_all_btn.clicked.connect(lambda: self._set_all_checked(True))
 
         self.select_none_btn = QToolButton()
         self.select_none_btn.setIcon(theme_icon("mActionDeselectAll.svg") or QIcon())
         self.select_none_btn.setText("Ничего")
-        self.select_none_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.select_none_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.select_none_btn.setToolTip("Снять все отметки")
         self.select_none_btn.clicked.connect(lambda: self._set_all_checked(False))
 
@@ -353,7 +355,7 @@ class PhotoFromPastVuDialog(QDialog):
         toolbar.addWidget(self.save_btn)
         layout.addLayout(toolbar)
 
-        results_splitter = QSplitter(Qt.Horizontal)
+        results_splitter = QSplitter(Qt.Orientation.Horizontal)
         results_splitter.setChildrenCollapsible(False)
 
         self.table = QTableWidget(0, 5)
@@ -362,17 +364,17 @@ class PhotoFromPastVuDialog(QDialog):
         self.table.verticalHeader().setDefaultSectionSize(30)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setWordWrap(False)
-        self.table.setTextElideMode(Qt.ElideRight)
+        self.table.setTextElideMode(Qt.TextElideMode.ElideRight)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(0, 34)
         self.table.setColumnWidth(1, 84)
         self.table.setColumnWidth(3, 136)
@@ -399,7 +401,7 @@ class PhotoFromPastVuDialog(QDialog):
 
         self.preview_image = QLabel("Выберите фотографию")
         self.preview_image.setObjectName("PreviewImage")
-        self.preview_image.setAlignment(Qt.AlignCenter)
+        self.preview_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_image.setFixedSize(258, 172)
         layout.addWidget(self.preview_image)
 
@@ -436,7 +438,7 @@ class PhotoFromPastVuDialog(QDialog):
         self.layer_combo.blockSignals(True)
         self.layer_combo.clear()
         for layer in QgsProject.instance().mapLayers().values():
-            if layer.type() != QgsMapLayer.VectorLayer:
+            if layer.type() != QgsMapLayer.LayerType.VectorLayer:
                 continue
             if not layer.crs().isValid():
                 continue
@@ -661,7 +663,7 @@ class PhotoFromPastVuDialog(QDialog):
 
             cid_item = QTableWidgetItem(str(photo.get("cid") or ""))
             cid_item.setFlags(ITEM_FLAGS)
-            cid_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            cid_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             cid_item.setData(USER_ROLE, photo)
             self.table.setItem(row, 4, cid_item)
         self.table.blockSignals(False)
@@ -772,6 +774,11 @@ class PhotoFromPastVuDialog(QDialog):
         self._request_preview(url, cid)
 
     def _request_preview(self, url, cid):
+        try:
+            url = validate_https_url(url, IMAGE_HOSTS)
+        except ValueError:
+            self.preview_image.setText("Недопустимый адрес изображения")
+            return
         old_reply = self._preview_reply
         self._preview_reply = None
         if old_reply is not None:
@@ -818,7 +825,7 @@ class PhotoFromPastVuDialog(QDialog):
         self.preview_image.setText("")
         self.preview_image.setPixmap(
             pixmap.scaled(
-                self.preview_image.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                self.preview_image.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
             )
         )
 
@@ -865,8 +872,11 @@ class PhotoFromPastVuDialog(QDialog):
         self.save_btn.setEnabled(True)
         try:
             self.iface.setActiveLayer(layer)
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError) as exc:
+            QgsMessageLog.logMessage(
+                f"Не удалось сделать слой активным: {exc}",
+                config.PLUGIN_NAME, Qgis.MessageLevel.Info,
+            )
         self.iface.mapCanvas().refresh()
         return layer
 
@@ -886,10 +896,13 @@ class PhotoFromPastVuDialog(QDialog):
         self._update_checked_count()
         try:
             self.iface.messageBar().pushInfo(
-                config.PLUGIN_NAME, message, Qgis.Info, 5
+                config.PLUGIN_NAME, message, Qgis.MessageLevel.Info, 5
             )
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError) as exc:
+            QgsMessageLog.logMessage(
+                f"Не удалось показать сообщение в QGIS: {exc}",
+                config.PLUGIN_NAME, Qgis.MessageLevel.Info,
+            )
 
     def _ensure_layer(self):
         if self._has_valid_layer():
@@ -912,7 +925,7 @@ class PhotoFromPastVuDialog(QDialog):
             self.download_dialog.activateWindow()
             return
         self.download_dialog = DownloadDialog(self.iface, layer, self)
-        self.download_dialog.setAttribute(Qt.WA_DeleteOnClose)
+        self.download_dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.download_dialog.pathsUpdated.connect(self._on_paths_updated)
         self.download_dialog.destroyed.connect(self._on_download_destroyed)
         self.download_dialog.show()
@@ -960,8 +973,11 @@ class PhotoFromPastVuDialog(QDialog):
         self.layer = new_layer
         try:
             self.iface.setActiveLayer(new_layer)
-        except Exception:  # noqa: BLE001
-            pass
+        except (AttributeError, RuntimeError) as exc:
+            QgsMessageLog.logMessage(
+                f"Не удалось сделать сохранённый слой активным: {exc}",
+                config.PLUGIN_NAME, Qgis.MessageLevel.Info,
+            )
         if self.download_dialog is not None:
             self.download_dialog.set_layer(new_layer)
         self.save_btn.setEnabled(True)
@@ -974,10 +990,10 @@ class PhotoFromPastVuDialog(QDialog):
             "Слой сохранён",
             "Временный слой заменён файловым.\n\n"
             f"{saved.path}\n\nОткрыть папку?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if answer == QMessageBox.Yes:
+        if answer == QMessageBox.StandardButton.Yes:
             QDesktopServices.openUrl(
                 QUrl.fromLocalFile(os.path.dirname(saved.path))
             )
@@ -999,14 +1015,20 @@ class PhotoFromPastVuDialog(QDialog):
         if geometry is not None:
             try:
                 self.restoreGeometry(geometry)
-            except Exception:  # noqa: BLE001
-                pass
+            except (TypeError, ValueError, RuntimeError) as exc:
+                QgsMessageLog.logMessage(
+                    f"Не удалось восстановить размер окна: {exc}",
+                    config.PLUGIN_NAME, Qgis.MessageLevel.Info,
+                )
         state = settings.value(f"{config.PREFIX}/splitter_state")
         if state is not None:
             try:
                 self.splitter.restoreState(state)
-            except Exception:  # noqa: BLE001
-                pass
+            except (TypeError, ValueError, RuntimeError) as exc:
+                QgsMessageLog.logMessage(
+                    f"Не удалось восстановить splitter: {exc}",
+                    config.PLUGIN_NAME, Qgis.MessageLevel.Info,
+                )
 
     def _save_window_state(self):
         settings = QgsSettings()
