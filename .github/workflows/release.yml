@@ -34,3 +34,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: NL_PhotoFromPastVu.zip
+          overwrite_files: true
