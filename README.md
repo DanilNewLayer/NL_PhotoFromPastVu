@@ -37,8 +37,6 @@ planning studio.
   `local_path` продолжают записываться уже в файл. При сохранении в
   существующий GeoPackage другие слои файла не удаляются.
   Поддерживаются GeoPackage, GeoJSON и Shapefile.
-- **Оформление**: красная шапка `#C8321A`, логотип мастерской со ссылкой
-  на [newlayer.ru](https://newlayer.ru/) и подпись в правом нижнем углу.
 
 ![Окно скачивания](docs/screenshots/download.png)
 
